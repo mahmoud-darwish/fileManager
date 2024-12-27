@@ -126,7 +126,8 @@ void Page::serialize(std::fstream& dbFile) {
                    dbFile.open(Storage::tablePath, std::ios::in | std::ios::out | std::ios::binary);
         if (!dbFile.is_open()) {
             throw std::runtime_error("Error File Metadata serialize: Unable to reopen the file stream.");
-        }    if (!dbFile) {
+        }    
+        if (!dbFile) {
                     std::cerr << "Error  page serialize: Failed to write slot metadata.\n";
                     
                 }
