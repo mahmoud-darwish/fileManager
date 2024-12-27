@@ -1,6 +1,8 @@
 // FileMetadata.cpp
 #include "FileMetaData.hpp"
 #include "storage.hpp"
+std::map<std::string, std::string> FileMetadata::schema;
+FileMetadata* FileMetadata::instance = nullptr;
 FileMetadata::FileMetadata() {
     std::memset(reserved, 0, RESERVED_SIZE);
 }
@@ -96,7 +98,8 @@ void FileMetadata::serialize(std::fstream& dbFile) {
 
     try {
         uint16_t schemaSize = schema.size();
-        dbFile.write(reinterpret_cast<char*>(&schemaSize), sizeof(schemaSize));
+        char buffer[12];
+        dbFile.write(std::to_string(schemaSize).c_str(), sizeof(schemaSize));
         for (const auto& [key, value] : schema) {
             uint16_t keySize = key.size();
             uint16_t valueSize = value.size();
@@ -123,7 +126,8 @@ void FileMetadata::serialize(std::fstream& dbFile) {
     }
 }
 
-void FileMetadata::deserialize(std::fstream& file) {
+std::map<std::string, std::string>  FileMetadata::deserialize(std::fstream& file) {
+    static std::map<std::string, std::string> schema1; 
     if (!file.is_open() || !file) {
         file.open(Storage::tablePath, std::ios::in | std::ios::out | std::ios::binary);
         if (!file.is_open()) {
@@ -134,7 +138,7 @@ void FileMetadata::deserialize(std::fstream& file) {
     try {
         uint16_t schemaSize;
         file.read(reinterpret_cast<char*>(&schemaSize), sizeof(schemaSize));
-        schema.clear();
+        schema1.clear();
         for (uint16_t i = 0; i < schemaSize; ++i) {
             uint16_t keySize, valueSize;
             file.read(reinterpret_cast<char*>(&keySize), sizeof(keySize));
@@ -145,7 +149,7 @@ void FileMetadata::deserialize(std::fstream& file) {
             std::string value(valueSize, '\0');
             file.read(&value[0], valueSize);
 
-            schema[key] = value;
+            schema1[key] = value;
         }
 
         file.read(reinterpret_cast<char*>(&pageCount), sizeof(pageCount));
@@ -166,6 +170,10 @@ void FileMetadata::deserialize(std::fstream& file) {
     } catch (const std::exception& e) {
         throw std::runtime_error(std::string("File Metadata Deserialization failed: ") + e.what());
     }
+    for (const auto& [key, type] : schema1) {
+        std::cout<<key<<" "<<" type";
+        std::cout<<std::endl;}
+    return schema1; 
 }
 
 void FileMetadata::printMetadata() const {
@@ -195,3 +203,10 @@ void FileMetadata::printMetadata() const {
 
     std::cout << "=====================\n";
 }
+ FileMetadata* FileMetadata::getInstance() {
+        if ( instance == nullptr) {
+            // Lazy initialization: Create the instance if it does not exist.
+            instance = new FileMetadata();
+        }
+        return instance;
+    }

@@ -39,7 +39,7 @@ public:
     const std::vector<Slot>& getSlots() const;
     Slot getSlot(size_t index) const;
 
-    bool addTuple(const std::string& tuple, FileMetadata& fileMetadata, int tupleId);
+    bool addTuple(const std::string& tuple, FileMetadata* fileMetadata, int tupleId);
     void serialize(std::fstream& dbFile);
     void deserialize(std::fstream& dbFile);
     std::string getTupleIndex(const std::string& tablePath, uint16_t tupleID);

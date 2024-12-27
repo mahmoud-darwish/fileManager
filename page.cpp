@@ -33,7 +33,7 @@ Slot Page::getSlot(size_t index) const {
     throw std::out_of_range("Slot index out of range");
 }
 
-bool Page::addTuple(const std::string& tuple, FileMetadata& fileMetadata, int tupleId) {
+bool Page::addTuple(const std::string& tuple, FileMetadata* fileMetadata, int tupleId) {
     std::cout << "Debug addTuple: Attempting to add tuple. Free space: " << metadata.freeSpace
                 << ", Tuple size: " << tuple.size() + sizeof(Slot) << std::endl;
 
@@ -61,7 +61,7 @@ bool Page::addTuple(const std::string& tuple, FileMetadata& fileMetadata, int tu
         std::cout << "Debug addTuple: Tuple added at offset: " << tupleOffset << " with size: " << tuple.size() << std::endl;
 
 
-        // Create a new slot for the tuple
+        // Create a new slot for the tuplef
         Slot slot = {tupleOffset, static_cast<uint16_t>(tuple.size())};
         slots.push_back(slot);
 
@@ -73,7 +73,7 @@ bool Page::addTuple(const std::string& tuple, FileMetadata& fileMetadata, int tu
 
 
         // Update FileMetadata with the new tuple location
-        fileMetadata.addTupleToPageMap(tupleId, metadata.pageID);
+        fileMetadata->addTupleToPageMap(tupleId, metadata.pageID);
         std::cout << "Debug addTuple: Adding tuple " << tupleId << " to page " << metadata.pageID << std::endl;
 
 
@@ -89,16 +89,16 @@ void Page::serialize(std::fstream& dbFile) {
         if (!dbFile.is_open()) {
             throw std::runtime_error("Error File Metadata serialize: Unable to reopen the file stream.");
         }        
-            return;
+           
         }
 
         // Write the page metadata
         dbFile.write(reinterpret_cast<char*>(&metadata), sizeof(PageMetadata));
         if (!dbFile) {
-dbFile.open(Storage::tablePath, std::ios::in | std::ios::out | std::ios::binary);
+            dbFile.open(Storage::tablePath, std::ios::in | std::ios::out | std::ios::binary);
         if (!dbFile.is_open()) {
             throw std::runtime_error("Error File Metadata serialize: Unable to reopen the file stream.");
-        }                return;
+        }               
         }
         std::cout << "Debug  page serialize: Serialized page metadata (PageID: " << metadata.pageID << ", SlotCount: " << metadata.slotCount << ")\n";
 
@@ -115,7 +115,7 @@ dbFile.open(Storage::tablePath, std::ios::in | std::ios::out | std::ios::binary)
         if (!dbFile.is_open()) {
             throw std::runtime_error("Error File Metadata serialize: Unable to reopen the file stream.");
         }    
-            return;
+            
         }
 
         std::cout << "Debug  page serialize: Active slots count: " << activeSlotCount << std::endl;
@@ -123,22 +123,30 @@ dbFile.open(Storage::tablePath, std::ios::in | std::ios::out | std::ios::binary)
         // Serialize each active slot
         for (const auto& slot : slots) {
             if (slot.length > 0) {
-                dbFile.write(reinterpret_cast<const char*>(&slot), sizeof(Slot));
-                if (!dbFile) {
+                   dbFile.open(Storage::tablePath, std::ios::in | std::ios::out | std::ios::binary);
+        if (!dbFile.is_open()) {
+            throw std::runtime_error("Error File Metadata serialize: Unable to reopen the file stream.");
+        }    if (!dbFile) {
                     std::cerr << "Error  page serialize: Failed to write slot metadata.\n";
-                    return;
+                    
                 }
+                dbFile.write(reinterpret_cast<const char*>(&slot), sizeof(Slot));
+                
                 std::cout << "Debug  page serialize: Serialized Slot. Offset: " << slot.offset 
                         << ", Length: " << slot.length << std::endl;
             }
         }
-
-        // Write the page data
-        dbFile.write(data, PAGE_SIZE);
+         dbFile.open(Storage::tablePath, std::ios::in | std::ios::out | std::ios::binary);
+        if (!dbFile.is_open()) {
+            throw std::runtime_error("Error File Metadata serialize: Unable to reopen the file stream.");
+        }  
         if (!dbFile) {
             std::cerr << "Error  page serialize: Failed to write page data.\n";
             return;
         }
+        // Write the page data
+        dbFile.write(data, PAGE_SIZE);
+        
         std::cout << "Debug  page serialize: Finished serializing page.\n";
 }
 
@@ -149,7 +157,7 @@ void Page::deserialize(std::fstream& dbFile) {
         dbFile.open(Storage::tablePath, std::ios::in | std::ios::out | std::ios::binary);
         if (!dbFile.is_open()) {
             throw std::runtime_error("Error File Metadata serialize: Unable to reopen the file stream.");
-        }                return;
+        }               
     }
 
     // Read the page metadata
@@ -158,7 +166,7 @@ void Page::deserialize(std::fstream& dbFile) {
 dbFile.open(Storage::tablePath, std::ios::in | std::ios::out | std::ios::binary);
         if (!dbFile.is_open()) {
             throw std::runtime_error("Error File Metadata serialize: Unable to reopen the file stream.");
-        }            return;
+        }            
     }
     std::cout << "Debug page deserialize: Deserialized page metadata successfully. PageID: " << metadata.pageID
               << ", SlotCount: " << metadata.slotCount << "\n";
@@ -171,7 +179,7 @@ dbFile.open(Storage::tablePath, std::ios::in | std::ios::out | std::ios::binary)
         if (!dbFile.is_open()) {
             throw std::runtime_error("Error File Metadata serialize: Unable to reopen the file stream.");
         }    
-        return;
+       
     }
     std::cout << "Debug page deserialize: Slot count from file: " << slotCount << std::endl;
 
@@ -208,7 +216,7 @@ dbFile.open(Storage::tablePath, std::ios::in | std::ios::out | std::ios::binary)
         if (!dbFile.is_open()) {
             throw std::runtime_error("Error File Metadata serialize: Unable to reopen the file stream.");
         }    
-        return;
+        
     }
 
     std::cout << "Debug page deserialize: Finished deserializing page. PageID: " << metadata.pageID << "\n";

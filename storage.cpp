@@ -21,7 +21,7 @@ bool Storage::tableExists(const std::string& dbName, const std::string& tableNam
 }
 
 // Function to create a new table with the provided schema
-bool Storage::createTable(const std::string& dbName, const std::string& tableName, const std::map<std::string, std::string>& schema) {
+bool Storage::createTable(const std::string& dbName, const std::string& tableName, const std::map<std::string, std::string>& schema1) {
     tablePath = dbName + "/" + tableName + ".HAD";
     std::cout << "Debug createTable: Creating table at path: " << tablePath << std::endl;
 
@@ -32,12 +32,13 @@ bool Storage::createTable(const std::string& dbName, const std::string& tableNam
 
     std::fstream newTable(tablePath, std::ios::binary | std::ios::out | std::ios::in | std::ios::trunc);
     if (newTable) {
-        FileMetadata metadata;
-        metadata.setPageCount(0); // Start with 0 pages
-        metadata.setSchema(schema); // Use the provided schema
+        FileMetadata* metadata = FileMetadata::getInstance();
+        metadata->setPageCount(0); // Start with 0 pages
+        FileMetadata::schema=schema1;// Use the provided schema
+        
         std::cout << "Debug createTable: Initialized metadata with 0 pages and provided schema." << std::endl;
 
-        metadata.serialize(newTable);  // Serialize metadata
+        metadata->serialize(newTable);  // Serialize metadata
         if (newTable) {
             std::cout << "Debug createTable: Serialized metadata to table file successfully." << std::endl;
         } else {
@@ -80,9 +81,9 @@ Page Storage::loadPageByID(const std::string& tablePath, uint32_t pageID) {
         }
     }
 
-    FileMetadata fileMetadata;
-    fileMetadata.deserialize(dbFile);
-    uint32_t pagePosition = fileMetadata.getPagePosition(pageID);
+    FileMetadata* fileMetadata = FileMetadata::getInstance();
+    fileMetadata->deserialize(dbFile);
+    uint32_t pagePosition = fileMetadata->getPagePosition(pageID);
     dbFile.seekg(pagePosition, std::ios::beg);
 
     Page page(pageID);
@@ -119,22 +120,22 @@ std::string Storage::loadTuple(const std::string& tablePath, uint16_t tupleID) {
         return "";
     }
 
-    FileMetadata fileMetadata;
+    FileMetadata* fileMetadata = FileMetadata::getInstance();
     try {
-        fileMetadata.deserialize(dbFile);
+        fileMetadata->deserialize(dbFile);
     } catch (const std::exception& e) {
         dbFile.close();
         return "";
     }
 
-    auto it = fileMetadata.getTupleToPageMap().find(tupleID);
-    if (it == fileMetadata.getTupleToPageMap().end() || it->second == -2) {
+    auto it = fileMetadata->getTupleToPageMap().find(tupleID);
+    if (it == fileMetadata->getTupleToPageMap().end() || it->second == -2) {
         dbFile.close();
         return "";
     }
 
     uint16_t pageID = it->second;
-    uint32_t pagePosition = fileMetadata.getPagePosition(pageID);
+    uint32_t pagePosition = fileMetadata->getPagePosition(pageID);
     dbFile.seekg(pagePosition, std::ios::beg);
 
     Page page(pageID);
@@ -162,9 +163,9 @@ std::map<std::string, std::string> Storage::get(const std::string& dbName, const
     }
 
     // Read file metadata to get the tuple-to-page map
-    FileMetadata fileMetadata;
+    FileMetadata* fileMetadata = FileMetadata::getInstance();
     try {
-        fileMetadata.deserialize(file);
+        fileMetadata->deserialize(file);
     } catch (const std::exception& e) {
         file.close();
         throw std::runtime_error("Error deserializing file metadata: " + std::string(e.what()));
@@ -179,8 +180,8 @@ std::map<std::string, std::string> Storage::get(const std::string& dbName, const
     }
 
     // Check if the tuple exists in the map
-    auto it = fileMetadata.getTupleToPageMap().find(stoi(id));
-    if (it == fileMetadata.getTupleToPageMap().end() || it->second == -1) {
+    auto it = fileMetadata->getTupleToPageMap().find(stoi(id));
+    if (it == fileMetadata->getTupleToPageMap().end() || it->second == -1) {
         // Tuple ID not found or is marked as deleted
         file.close();
         throw std::out_of_range("Tuple ID not found");
@@ -190,7 +191,7 @@ std::map<std::string, std::string> Storage::get(const std::string& dbName, const
     uint32_t pageID = it->second;
 
     // Calculate the position of the page in the file
-    file.seekg(fileMetadata.getPagePosition(pageID), std::ios::beg);
+    file.seekg(fileMetadata->getPagePosition(pageID), std::ios::beg);
 
      if (!file.good()) {
         file.close();
@@ -249,9 +250,9 @@ bool Storage::addTupleToTable(const std::string& dbName, const std::string& tabl
     }
     std::cout << "Debug addTupleToTable: Successfully opened table file for reading and writing.\n";
 
-    FileMetadata fileMetadata;
+    FileMetadata* fileMetadata=FileMetadata::getInstance();
     try {
-        fileMetadata.deserialize(file);
+        fileMetadata->deserialize(file);
         std::cout << "Debug addTupleToTable: Deserialized file metadata.\n";
     } catch (const std::exception& e) {
         std::cerr << "Error deserializing file metadata: " << e.what() << std::endl;
@@ -260,8 +261,8 @@ bool Storage::addTupleToTable(const std::string& dbName, const std::string& tabl
     }
 
     // Check if there is space in the existing pages
-    int pageId = fileMetadata.getPageCount(); // Assuming this is the next available page ID
-    size_t pagePosition = fileMetadata.getPagePosition(pageId);  // Calculate the position of the page
+    int pageId = fileMetadata->getPageCount(); // Assuming this is the next available page ID
+    size_t pagePosition = fileMetadata->getPagePosition(pageId);  // Calculate the position of the page
 
     // Read the page to check for space
     file.seekg(pagePosition);
@@ -279,7 +280,7 @@ bool Storage::addTupleToTable(const std::string& dbName, const std::string& tabl
         
         // Update metadata after adding a tuple to an existing page
         file.seekp(0);  // Go to the beginning of the file to write metadata
-        fileMetadata.serialize(file);  // Update the metadata
+        fileMetadata->serialize(file);  // Update the metadata
         // Flush and close the file
         file.flush();
         file.close();
@@ -292,7 +293,7 @@ bool Storage::addTupleToTable(const std::string& dbName, const std::string& tabl
 
     // If no existing page had space, create a new page and append it
     
-    Page newPage(fileMetadata.getNextPageID()); // Assuming this method gives the next available page ID
+    Page newPage(fileMetadata->getNextPageID()); // Assuming this method gives the next available page ID
     std::cout << "Debug addTupleToTable: No space on existing pages. Creating a new page with ID: " << newPage.getPageID() << "\n";
     
     if (!newPage.addTuple(tupleSerialized, fileMetadata, id)) {
@@ -308,9 +309,9 @@ bool Storage::addTupleToTable(const std::string& dbName, const std::string& tabl
     std::cout << "Debug addTupleToTable: New page serialized and appended to file.\n";
 
     // Increment the page ID after creating a new page
-    fileMetadata.incrementPageID();
+    fileMetadata->incrementPageID();
     file.seekp(0);  // Seek to the beginning of the file to write metadata
-    fileMetadata.serialize(file);  // Write updated metadata
+    fileMetadata->serialize(file);  // Write updated metadata
     file.close();
     
     std::cout << "Debug addTupleToTable: Tuple successfully added to a new page.\n";;
@@ -344,14 +345,14 @@ bool Storage::checkTupleExists(const std::string& dbName, const std::string& tab
     // Open the table file for reading
     std::fstream file(tablePath, std::ios::binary | std::ios::in);
     if (!file) {
-        std::cerr << "Failed to open table file: " << tablePath << "\n";
+        std::cerr << "Failed to open table g: " << tablePath << "\n";
         return false;
     }
 
     // Read the file metadata
-    FileMetadata fileMetadata;
+    FileMetadata* fileMetadata=FileMetadata::getInstance();
     try {
-        fileMetadata.deserialize(file);
+        fileMetadata->deserialize(file);
     } catch (const std::exception& e) {
         std::cerr << "Error deserializing file metadata: " << e.what() << "\n";
         file.close();
@@ -359,7 +360,7 @@ bool Storage::checkTupleExists(const std::string& dbName, const std::string& tab
     }
 
     // Check if the tuple ID exists in the tuple-to-page map in file metadata
-    if (fileMetadata.hasTupleInPageMap(std::stoi(id))) {
+    if (fileMetadata->hasTupleInPageMap(std::stoi(id))) {
         std::cout << "Tuple with ID '" << id << "' found in table: " << tableName << " (via metadata lookup).\n";
         file.close();
         return true; // Tuple found via metadata map
@@ -398,17 +399,23 @@ bool Storage::insert(const std::string& dbName, const std::string& tableName, co
     }
 
     // Read file metadata, including schema
-    FileMetadata fileMetadata;
-    fileMetadata.deserialize(file);
+    FileMetadata* fileMetadata=FileMetadata::getInstance();
+    std::map<std::string, std::string>  schema2=fileMetadata->deserialize(file);
 
     // Extract and validate tuple attributes against schema in file metadata
     std::map<std::string, std::pair<int, std::string>> attributes = tuple.getAttributes();
-    for (const auto& [key, type] : fileMetadata.getSchema()) {
+    for (const auto& attr : attributes) {
+        std::cout<< attr.first<<" ";
+    }
+    std::cout<<std::endl;
+    for (const auto& [key, type] : schema2) {
+        std::cout<<key<<" "<<" type";
+        std::cout<<std::endl;
         // Check if attribute exists in tuple
-        if (attributes.find(key) == attributes.end()) {
-            std::cerr << "Missing required attribute: " << key << std::endl;
-            return false;
-        }
+        // if (attributes.find(key) == attributes.end()) {
+        //     std::cerr << "Missing required attribute: " << key << std::endl;
+        //     return false;
+        // }
 
         // Check data type and length
         const auto& [attrType, attrValue] = attributes[key];
@@ -421,7 +428,7 @@ bool Storage::insert(const std::string& dbName, const std::string& tableName, co
     // Check if 'id' is unique using tuple-to-page map in file metadata
     std::string idValue = attributes["id"].second; // Assuming "id" is always present
     int id = std::stoi(idValue);
-    if (fileMetadata.hasTupleWithID(id)) {
+    if (fileMetadata->hasTupleWithID(id)) {
         std::cerr << "Duplicate ID: " << id << " for table: " << tableName << std::endl;
         return false;
     }
@@ -546,3 +553,4 @@ bool Storage::updateTupleInTable(const std::string& dbName, const std::string& t
     std::cout << "Successfully updated tuple with ID: " << id << std::endl;
     return true; // Tuple successfully updated
 }
+

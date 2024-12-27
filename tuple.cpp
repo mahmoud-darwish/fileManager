@@ -65,7 +65,7 @@ bool Tuple::deserialize(const std::string& data) {
 
 // Retrieve all attributes as a map
 std::map<std::string, std::pair<int, std::string>> Tuple::getAttributes() const {
-    std::map<std::string, std::pair<int, std::string>> attributesMap;
+      static std::map<std::string, std::pair<int, std::string>> attributesMap;
     for (const auto& attr : attributes) {
         attributesMap[attr.first] = attr.second;
     }
