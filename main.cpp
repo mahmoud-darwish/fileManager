@@ -8,7 +8,23 @@ int main() {
     std::string tableName = "users";
     
     // Define a simple schema for the table
-   
+    std::map<std::string, std::string> schema = {
+        {"id", "int"},
+        {"name", "string"},
+        {"age", "int"}
+    };
+    
+    // Step 1: Create the database if it doesn't exist
+    if (!storage.createDatabase(dbName)) {
+        std::cerr << "Failed to create the database." << std::endl;
+        return -1;
+    }
+
+    // Step 2: Create the table with the schema
+    if (!storage.createTable(dbName, tableName, schema)) {
+        std::cerr << "Failed to create the table." << std::endl;
+        return -1;
+    }
 
     // Step 3: Prepare a tuple to insert into the table
     Tuple newTuple;
